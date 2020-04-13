@@ -31,7 +31,20 @@ class RecipientController {
   }
 
   async index(req, res) {
-    return res.json({ ok: true });
+    const recipients = await Recipient.findAll({
+      attributes: [
+        'id',
+        'name',
+        'cep',
+        'address',
+        'address_number',
+        'address_complement',
+        'address_city',
+        'address_state',
+      ],
+    });
+
+    return res.json(recipients);
   }
 
   async update(req, res) {
