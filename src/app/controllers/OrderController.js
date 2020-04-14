@@ -6,7 +6,9 @@ import Deliveryman from '../models/Deliveryman';
 import File from '../models/File';
 import Notification from '../schemas/Notification';
 
-import Mail from '../../lib/mail';
+import NewOrderMail from '../jobs/NewOrderMail';
+import CancellationMail from '../jobs/CancellationMail';
+import Queue from '../../lib/Queue';
 
 class OrderController {
   async store(req, res) {
@@ -57,17 +59,7 @@ class OrderController {
       deliveryman: deliveryman_id,
     });
 
-    await Mail.sendMail({
-      to: `${deliveryman.name} <${deliveryman.email}>`,
-      subject: `Novo pedido para ${recipient.name}`,
-      template: 'newOrder',
-      context: {
-        deliveryman: deliveryman.name,
-        recipient: recipient.name,
-        product: order.product,
-        address: `${recipient.address}, ${recipient.address_number} ${recipient.address_complement}, ${recipient.address_city} - ${recipient.address_state} `,
-      },
-    });
+    await Queue.add(NewOrderMail.key, { deliveryman, recipient, order });
 
     return res.json(order);
   }
@@ -159,7 +151,7 @@ class OrderController {
       attributes: [
         'id',
         'product',
-        'canceld_at',
+        'canceled_at',
         'start_date',
         'end_date',
         'recipient_id',
@@ -193,17 +185,12 @@ class OrderController {
 
     await order.save();
 
-    await Mail.sendMail({
-      to: `${order.deliveryman.name} <${order.deliveryman.email}>`,
-      subject: `Cancelamento do pedido ${order.id} de ${order.recipient.name}`,
-      template: 'cancelation',
-      context: {
-        deliveryman: order.deliveryman.name,
-        recipient: order.recipient.name,
-        product: order.product,
-        canceledBy: `Cancelado pelo administrador`,
-      },
+    await Notification.create({
+      content: `Olá ${order.deliveryman.name}. Sua entrega para ${order.recipient.name} foi canelada. Para mais detalhes acesse seu email.`,
+      deliveryman: order.deliveryman_id,
     });
+
+    await Queue.add(CancellationMail.key, { order });
 
     return res.json(order);
   }
