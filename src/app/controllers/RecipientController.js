@@ -48,11 +48,56 @@ class RecipientController {
   }
 
   async update(req, res) {
-    return res.json({ ok: true });
+    const { id } = req.params;
+
+    const recipient = await Recipient.findByPk(id);
+
+    if (!recipient) {
+      return res.status(400).json({ error: 'Recipient does not exists' });
+    }
+
+    const {
+      name,
+      cep,
+      address,
+      address_number,
+      address_complement,
+      address_city,
+      address_state,
+    } = req.body;
+
+    const recipientUpdated = await Recipient.update(
+      {
+        name,
+        cep,
+        address,
+        address_number,
+        address_complement,
+        address_city,
+        address_state,
+      },
+      {
+        where: { id },
+        returning: true,
+        plain: true,
+      }
+    );
+
+    return res.json(recipientUpdated[1]);
   }
 
   async delete(req, res) {
-    return res.json({ ok: true });
+    const { id } = req.params;
+
+    const recipient = await Recipient.findByPk(id);
+
+    if (!recipient) {
+      return res.status(400).json({ error: 'Recipient does not exists' });
+    }
+
+    await Recipient.destroy(id);
+
+    return res.status(204).send();
   }
 }
 

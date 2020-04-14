@@ -1,7 +1,12 @@
 import * as Yup from 'yup';
+
 import Order from '../models/Order';
 import Recipient from '../models/Recipient';
 import Deliveryman from '../models/Deliveryman';
+import File from '../models/File';
+import Notification from '../schemas/Notification';
+
+import Mail from '../../lib/mail';
 
 class OrderController {
   async store(req, res) {
@@ -14,14 +19,6 @@ class OrderController {
       start_date: Yup.date(),
       end_date: Yup.date(),
     });
-
-    /* const userExists = await Recipient.findOne({
-      where: { name: req.body.name },
-    });
-
-    if (userExists) {
-      return res.status(400).json({ error: 'User already exists.' });
-    } */
 
     if (!(await schema.isValid(req.body))) {
       return res.status(400).json({ error: 'Validation fails' });
@@ -47,21 +44,168 @@ class OrderController {
 
     const order = await Order.create(req.body);
 
+    const deliveryman = await Deliveryman.findByPk(deliveryman_id);
+
+    const recipient = await Recipient.findByPk(recipient_id);
+
+    /**
+     * Notify delivery
+     */
+
+    await Notification.create({
+      content: `Olá ${deliveryman.name}. Você tem uma nova entrega para ${recipient.name}.`,
+      deliveryman: deliveryman_id,
+    });
+
+    await Mail.sendMail({
+      to: `${deliveryman.name} <${deliveryman.email}>`,
+      subject: `Novo pedido para ${recipient.name}`,
+      template: 'newOrder',
+      context: {
+        deliveryman: deliveryman.name,
+        recipient: recipient.name,
+        product: order.product,
+        address: `${recipient.address}, ${recipient.address_number} ${recipient.address_complement}, ${recipient.address_city} - ${recipient.address_state} `,
+      },
+    });
+
     return res.json(order);
   }
 
   async index(req, res) {
-    const oders = await Order.findAll({});
+    const { page = 1 } = req.query;
+
+    const oders = await Order.findAll({
+      where: { canceled_at: null },
+      order: ['created_at'],
+      attributes: [
+        'id',
+        'product',
+        'canceled_at',
+        'start_date',
+        'end_date',
+        'recipient_id',
+        'deliveryman_id',
+        'signature_id',
+      ],
+      limit: 20,
+      offset: (page - 1) * 20,
+      include: [
+        {
+          model: Recipient,
+          as: 'recipient',
+          attributes: [
+            'id',
+            'name',
+            'cep',
+            'address',
+            'address_number',
+            'address_complement',
+            'address_city',
+            'address_state',
+          ],
+        },
+        {
+          model: Deliveryman,
+          as: 'deliveryman',
+          attributes: ['id', 'name', 'email'],
+          include: [
+            {
+              model: File,
+              as: 'avatar',
+              attributes: ['id', 'path', 'url'],
+            },
+          ],
+        },
+      ],
+    });
 
     return res.json(oders);
   }
 
   async update(req, res) {
-    return res.json({ ok: true });
+    const { id } = req.params;
+    const order = await Order.findByPk(id);
+    const { recipient_id, deliveryman_id, product } = req.body;
+
+    if (!order) {
+      return res.status(400).json({ error: 'Order does not exists' });
+    }
+
+    if (order.start_date) {
+      return res
+        .status(403)
+        .json({ error: 'It is not possible to update a order in progress' });
+    }
+
+    if (order.end_date) {
+      return res
+        .status(403)
+        .json({ error: 'It is not possible to delete a completed order' });
+    }
+
+    order.recipient_id = recipient_id;
+    order.deliveryman_id = deliveryman_id;
+    order.product = product;
+
+    await order.save();
+
+    return res.json(order);
   }
 
   async delete(req, res) {
-    return res.json({ ok: true });
+    const { id } = req.params;
+    const order = await Order.findByPk(id, {
+      attributes: [
+        'id',
+        'product',
+        'canceld_at',
+        'start_date',
+        'end_date',
+        'recipient_id',
+        'deliveryman_id',
+      ],
+      include: [
+        {
+          model: Recipient,
+          as: 'recipient',
+          attributes: ['id', 'name'],
+        },
+        {
+          model: Deliveryman,
+          as: 'deliveryman',
+          attributes: ['id', 'name', 'email'],
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(400).json({ error: 'Order does not exists' });
+    }
+
+    if (order.end_date) {
+      return res
+        .status(403)
+        .json({ error: 'It is not possible to delete a completed order' });
+    }
+
+    order.canceled_at = new Date();
+
+    await order.save();
+
+    await Mail.sendMail({
+      to: `${order.deliveryman.name} <${order.deliveryman.email}>`,
+      subject: `Cancelamento do pedido ${order.id} de ${order.recipient.name}`,
+      template: 'cancelation',
+      context: {
+        deliveryman: order.deliveryman.name,
+        recipient: order.recipient.name,
+        product: order.product,
+        canceledBy: `Cancelado pelo administrador`,
+      },
+    });
+
+    return res.json(order);
   }
 }
 

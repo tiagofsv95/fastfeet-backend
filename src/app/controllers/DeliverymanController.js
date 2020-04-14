@@ -43,11 +43,44 @@ class DeliverymanController {
   }
 
   async update(req, res) {
-    return res.json({ ok: true });
+    const { id } = req.params;
+
+    const deliveryman = await Deliveryman.findByPk(id);
+
+    if (!deliveryman) {
+      return res.status(400).json({ error: 'Deliveryman does not exists' });
+    }
+
+    const { name, email, avatar_id } = req.body;
+
+    const deliverymanUpdated = await Deliveryman.update(
+      {
+        name,
+        email,
+        avatar_id,
+      },
+      {
+        where: { id },
+        returning: true,
+        plain: true,
+      }
+    );
+
+    return res.json(deliverymanUpdated[1]);
   }
 
   async delete(req, res) {
-    return res.json({ ok: true });
+    const { id } = req.params;
+
+    const deliveryman = await Deliveryman.findByPk(id);
+
+    if (!deliveryman) {
+      return res.status(400).json({ error: 'Deliveryman does not exists' });
+    }
+
+    await Deliveryman.destroy(id);
+
+    return res.status(204).send();
   }
 }
 
