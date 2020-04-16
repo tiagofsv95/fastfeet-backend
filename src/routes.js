@@ -10,6 +10,10 @@ import DeliverymanController from './app/controllers/DeliverymanController';
 import OrderController from './app/controllers/OrderController';
 import DeliveryController from './app/controllers/DeliveryController';
 import DeliveriedController from './app/controllers/DeliveriedController';
+import DeliveryProblemsController from './app/controllers/DeliveryProblemsController';
+import OrderProblems from './app/controllers/OrderProblems';
+import StartDeliveryController from './app/controllers/StartDeliveryController';
+import EndDeliveryController from './app/controllers/EndDeliveryController';
 import NotificationController from './app/controllers/NotificationController';
 
 import authMiddleware from './app/middlewares/auth';
@@ -19,6 +23,15 @@ const upload = multer(multerConfig);
 
 routes.post('/users', UserController.store);
 routes.post('/sessions', SessionController.store);
+
+routes.get('/delivery/:id', DeliveryController.index);
+routes.get('/delivery/:id/deliveries', DeliveriedController.index);
+
+routes.post('/delivery/:id/problems', DeliveryProblemsController.store);
+routes.get('/delivery/:id/problems', OrderProblems.index);
+
+routes.post('/end_delivery/:id', EndDeliveryController.store);
+routes.post('/start_delivery/:id', StartDeliveryController.store);
 
 routes.use(authMiddleware);
 
@@ -41,10 +54,10 @@ routes.post('/orders', OrderController.store);
 routes.put('/orders/:id', OrderController.update);
 routes.delete('/orders/:id', OrderController.delete);
 
-routes.get('/delivery/:id', DeliveryController.index);
-routes.get('/delivery/:id/deliveries', DeliveriedController.index);
-
 routes.get('/notifications/:id', NotificationController.index);
 routes.put('/notifications/:id', NotificationController.update);
+
+routes.get('/deliveryproblems', DeliveryProblemsController.index);
+routes.delete('/delivery/:id/cancel', DeliveryProblemsController.delete);
 
 export default routes;

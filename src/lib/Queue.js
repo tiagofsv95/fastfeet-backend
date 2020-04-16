@@ -36,9 +36,9 @@ class Queue {
     });
   }
 
-  // handlefailure(job, err) {
-
-  // }
+  handlefailure(job, err) {
+    console.log(err, job);
+  }
 }
 
 export default new Queue();
